@@ -48,29 +48,26 @@ def get_smile_deformation_grid(
     if abs(scale) < 1e-5:
         return torch.stack([grid_x, grid_y], dim=-1).unsqueeze(0)
 
-    # 1. Mouth corners lift and pull outwards
-    # Calibrated to the avatar's mouth corners: x = +-0.195, y = 0.435
-    r_l = torch.sqrt((grid_x - (-0.195)) ** 2 + (grid_y - 0.435) ** 2)
-    r_r = torch.sqrt((grid_x - 0.195) ** 2 + (grid_y - 0.435) ** 2)
-    inf_corners = torch.exp(-0.5 * (torch.min(r_l, r_r) / 0.11) ** 2)
+    # 1. Mouth corners gentle upward curve (natural zygomaticus trajectory)
+    # Calibrated to the avatar's mouth corners: x = +-0.190, y = 0.435
+    r_l = torch.sqrt((grid_x - (-0.190)) ** 2 + (grid_y - 0.435) ** 2)
+    r_r = torch.sqrt((grid_x - 0.190) ** 2 + (grid_y - 0.435) ** 2)
+    inf_corners = torch.exp(-0.5 * (torch.min(r_l, r_r) / 0.10) ** 2)
 
-    # 2. Upper lip center slight lift to expose smile line
-    r_ulip = torch.sqrt((grid_x / 0.10) ** 2 + ((grid_y - 0.42) / 0.04) ** 2)
-    inf_ulip = torch.exp(-0.5 * r_ulip ** 2)
-
-    # 3. Nasolabial fold / cheek elevation
+    # 2. Nasolabial fold / cheek elevation (elevates the cheeks naturally)
     r_cl = torch.sqrt((grid_x - (-0.23)) ** 2 + (grid_y - 0.28) ** 2)
     r_cr = torch.sqrt((grid_x - 0.23) ** 2 + (grid_y - 0.28) ** 2)
-    inf_cheeks = torch.exp(-0.5 * (torch.min(r_cl, r_cr) / 0.14) ** 2)
+    inf_cheeks = torch.exp(-0.5 * (torch.min(r_cl, r_cr) / 0.13) ** 2)
 
-    # 4. Under-eye soft squint (Duchenne smile marker)
+    # 3. Under-eye soft crinkle / squint (genuine Duchenne smile warmth)
     r_el = torch.sqrt((grid_x - (-0.22)) ** 2 + (grid_y - 0.14) ** 2)
     r_er = torch.sqrt((grid_x - 0.22) ** 2 + (grid_y - 0.14) ** 2)
     inf_eyes = torch.exp(-0.5 * (torch.min(r_el, r_er) / 0.08) ** 2)
 
-    # In grid_sample, sampling from (y + dy) where dy > 0 pulls pixels upward in the output
-    dy = scale * (0.040 * inf_corners + 0.012 * inf_ulip + 0.018 * inf_cheeks + 0.008 * inf_eyes)
-    dx = -scale * (0.022 * inf_corners * torch.sign(grid_x))
+    # Smooth upward lift without horizontal mouth stretching or forced teeth exposure:
+    # dy lifts corners and cheeks smoothly; dx is minimal (0.004) to avoid horizontal creases
+    dy = scale * (0.022 * inf_corners + 0.012 * inf_cheeks + 0.006 * inf_eyes)
+    dx = -scale * (0.004 * inf_corners * torch.sign(grid_x))
 
     warp_grid = torch.stack([grid_x + dx, grid_y + dy], dim=-1).unsqueeze(0)
     return warp_grid

@@ -1,0 +1,9 @@
+Keys: ['expression_delta', 'expression_mask', 'delta_raw', 'happy_mean', 'neutral_mean', 'combined_var', 'mask_percentile', 'happy_frames', 'neutral_frames', 'happy_video', 'neutral_video', 'raw_happy_motions', 'raw_neutral_motions']
+expression_delta: shape=(32,), norm=49.6692
+  range: [-25.0397, 8.7055]
+  top-5 dims by |delta|: [10, 31, 22, 30, 25]
+expression_mask: shape=(32,)
+  mask > 0.5: 19/32
+  mask > 0.8: 10/32
+  weighted delta norm: 34.7571
+  happy_frames: 91, neutral_frames: 193

@@ -1,0 +1,15 @@
+  ...     0s  [try19] Mimi decoder fine-tune hook installed -> /workspace/speech2face/weights/mimi_dec_gan_robert5.pt
+  ...    15s  [try19] depformer GATING int4: 192 Linears (-2.74 ms)
+
+loaded after 30s: {'ok': True, 'stage': 'live_moshi_reply_helium_fm', 'uptime_sec': 27.619, 'loaded': True}
+
+$ grep -aE 'x86:|int4 G=|GATING|TRY19_PD hook|fine-tune hook|captured AT INIT|trt_seanet|expression delta|expr_alpha|Uvicorn running' run.log || echo '(none found yet)'
+x86: trunk int4 G=32 + robert5 one-pass depformer + GAN decoder (TensorRT) voice=Robert_5.pt port=8991 expr_alpha=1.0
+[try19] Mimi decoder fine-tune hook installed -> /workspace/speech2face/weights/mimi_dec_gan_robert5.pt
+[try19] TRY19_PD hook installed -> /workspace/speech2face/weights/pd_quant_onpol_robert5_plaus2.pt (refine=0)
+[try19] expression delta loaded: /workspace/speech2face/assets/happy_expression_delta.pt alpha=1.0 mask_active=19/32
+[try19] int4 G=32: 128 Linears at load in 0s (before graph capture)
+[try19] depformer GATING int4: 192 Linears (-2.74 ms)
+[try19] mimi encode graph captured AT INIT: True
+[trt_seanet] mimi.decoder -> TensorRT /workspace/speech2face/weights/seanet_w12_fp32.engine (window 12 steps = 480 ms)
+INFO:     Uvicorn running on http://0.0.0.0:8991 (Press CTRL+C to quit)

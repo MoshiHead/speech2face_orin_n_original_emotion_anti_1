@@ -55,10 +55,19 @@ else
   echo "note: no weights/seanet_w12_fp32.engine -- using Mimi's PyTorch SEANet decoder"
 fi
 
+# ---- expression configuration (natural smile) ----
+EXPR_ALPHA="${EXPR_ALPHA:-1.0}"
+EXPR_PRESET="${EXPR_PRESET:-natural}"
+EXPR_FLAGS="--expression_alpha $EXPR_ALPHA --expression_preset $EXPR_PRESET"
+if [ -n "${EXPR_DELTA_PATH:-}" ] && [ -s "$EXPR_DELTA_PATH" ]; then
+  EXPR_FLAGS="$EXPR_FLAGS --expression_delta_path $EXPR_DELTA_PATH"
+fi
+echo "expression: alpha=$EXPR_ALPHA preset=$EXPR_PRESET"
+
 mkdir -p "$SRC/niloys/live/static" "$HERE/captures"
 ln -sfn "$SRC/imtalker/static/assets" "$SRC/niloys/live/static/assets"
 ln -sfn "$SRC/niloys/static/index_try21_no_idle_dissolve.html" "$SRC/niloys/live/static/index.html"
-echo "x86: trunk int4 G=$TRY19_INT4_G + robert5 one-pass depformer + GAN decoder$([ -n "${TRY19_TRT_SEANET:-}" ] && echo ' (TensorRT)') voice=${VOICE:-Robert_5.pt} port=$PORT"
+echo "x86: trunk int4 G=$TRY19_INT4_G + robert5 one-pass depformer + GAN decoder$([ -n "${TRY19_TRT_SEANET:-}" ] && echo ' (TensorRT)') voice=${VOICE:-Robert_5.pt} port=$PORT expr_alpha=$EXPR_ALPHA"
 exec "$PY" -u "$SRC/niloys/live/imtalker_try19_student_live.py" \
   --live_module imtalker_native_passthrough \
   --student_ckpt "$W/motion_student_38M.pt" --distilled_renderer "$W/renderer_narrow.pt" \
@@ -87,4 +96,5 @@ exec "$PY" -u "$SRC/niloys/live/imtalker_try19_student_live.py" \
   --silence_helium_path "$W/silence_helium_mean.pt" \
   --jpeg_quality 90 --device cuda --reply_audio_gain 1.0 --output_audio_codec opus \
   --capture_dir "$HERE/captures" \
-  --blink_motion_path "$W/blink_motion.pt"
+  --blink_motion_path "$W/blink_motion.pt" \
+  $EXPR_FLAGS

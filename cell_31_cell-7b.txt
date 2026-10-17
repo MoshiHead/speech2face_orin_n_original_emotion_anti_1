@@ -1,0 +1,37 @@
+$ PY="$(cat .python_path)" && "$PY" tools/extract_expression_delta.py   --happy_video emotion_demo_videos/happy.mp4   --neutral_video emotion_demo_videos/neutral.mp4   --renderer_path weights/renderer.ckpt   --student_ckpt weights/motion_student_38M.pt   --output assets/happy_expression_delta.pt   --mask_percentile 60   --device cuda
+Device: cuda
+Loading full IMTRenderer (MotionEncoder) ...
+Renderer checkpoint not found at 'weights/renderer.ckpt'.
+Downloading renderer.ckpt from HuggingFace repo 'cbsjtu01/IMTalker' (~2.1 GB) ...
+    Renderer checkpoint ready at weights/renderer.ckpt
+    MotionEncoder output dim: 32
+Extracting motions from happy video ...
+    emotion_demo_videos/happy.mp4: 91 frames, motion range [-14.6420, 18.7231]
+Extracting motions from neutral video ...
+    emotion_demo_videos/neutral.mp4: 193 frames, motion range [-15.4351, 20.2785]
+
+Raw expression delta:
+    norm = 7.5542
+    per-dim abs range: [0.0628, 3.7827]
+    top-5 dims by |delta|: [10, 31, 30, 25, 27]
+
+Expression mask:
+    variance threshold (p60): 0.122367
+    mask range: [0.0000, 0.9777]
+    dims with mask > 0.5: 19/32
+    dims with mask > 0.8: 10/32
+
+Loading student normalization stats from weights/motion_student_38M.pt ...
+    motion_mean range: [-12.9424, 17.6212]
+    motion_std range: [0.0710, 0.6001]
+    normalized delta norm: 49.6692
+
+Saved expression delta to assets/happy_expression_delta.pt
+    expression_delta: (32,)
+    expression_mask: (32,)
+
+Done.  Use --expression_delta_path in imtalker_try19_student_live.py to apply.
+
+--- expression delta extraction took 28.2 s ---
+
+✓ Expression delta saved: /workspace/speech2face/assets/happy_expression_delta.pt (40991 bytes)

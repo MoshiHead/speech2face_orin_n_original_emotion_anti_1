@@ -246,14 +246,6 @@ def make_student_sampler(model, cfg, blend_frames=10, jump_thresh=0.6, mouth_clo
             mu = cur if not isinstance(mu, torch.Tensor) else (0.99 * mu + 0.01 * cur)
             pred_n = mu + (pred_n - mu) * motion_gain
             ss = dict(ss); ss["_student_gain_mu"] = mu.detach()
-        # ---- expression blend (after gain, before denorm) ----
-        # pred_n has shape [B, steps, frames_per_step(2), motion_dim(32)]
-        # expression_delta and expression_mask are [32].
-        # Adding (mask * delta * alpha) of shape [32] broadcasts seamlessly over
-        # the last dimension (dim -1 = 32), shifting every frame by the same delta.
-        if expression_delta is not None and expression_mask is not None:
-            _ed = (expression_mask * expression_delta * expression_alpha).to(pred_n.dtype)
-            pred_n = pred_n + _ed
         motion = model.denorm_motion(pred_n)[0].reshape(-1, 32)
 
         if motion.shape[0] < target_frames:
@@ -496,9 +488,12 @@ def main():
     pre.add_argument("--mouth_close", type=float, default=0.5,
                      help="pull the crossfade start toward the reference (closed) pose, 0..1")
     pre.add_argument("--expression_delta_path", default="",
-                     help="path to happy_expression_delta.pt for expression blending")
-    pre.add_argument("--expression_alpha", type=float, default=1.0,
-                     help="expression intensity multiplier (0=off, 1=full, >1=exaggerated)")
+                     help="path to happy_expression_delta.pt or expression config (optional)")
+    pre.add_argument("--expression_alpha", type=float, default=0.0,
+                     help="expression intensity multiplier (0=off/neutral, 1.0=natural smile)")
+    pre.add_argument("--expression_preset", default="natural",
+                     choices=["subtle", "natural", "happy", "broad"],
+                     help="smile expression preset profile")
     mine, remaining = pre.parse_known_args()
 
     if any(a == "8998" for a in remaining):
@@ -819,7 +814,24 @@ def main():
         patch_depformer(live, mine.dep_q)
     if mine.distilled_renderer:
         _bl = load_blink_delta(mine.blink_delta, device) if mine.blink_delta else None
-        patch_render(live, load_distilled_renderer(mine.distilled_renderer, device), _bl)
+        D = load_distilled_renderer(mine.distilled_renderer, device)
+        if mine.expression_alpha > 0:
+            try:
+                import sys
+                here = Path(__file__).resolve().parent
+                if str(here) not in sys.path:
+                    sys.path.insert(0, str(here))
+                from expression import apply_smile_to_base_frame
+                print(f"[try19] applying natural smile expression: "
+                      f"alpha={mine.expression_alpha} preset={mine.expression_preset}", flush=True)
+                with torch.no_grad():
+                    warped_base = apply_smile_to_base_frame(
+                        D.base_frame, alpha=mine.expression_alpha, preset=mine.expression_preset
+                    )
+                    D.base_frame.copy_(warped_base)
+            except Exception as e:
+                print(f"[try19] WARNING failed to apply smile expression: {e}", flush=True)
+        patch_render(live, D, _bl)
     print(f"[try19] motion_gain={mine.motion_gain}", flush=True)
     print(f"[try19] barge-in crossfade: {mine.blend_frames} frames "
           f"({mine.blend_frames*40} ms), jump_thresh={mine.jump_thresh}, "

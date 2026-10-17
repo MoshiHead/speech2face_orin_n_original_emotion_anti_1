@@ -1,0 +1,14 @@
+$ PY="$(cat .python_path)" && "$PY" tools/offline_capture.py 8991 "tools/test_question.wav" offline_test_neutral 15
+/workspace/speech2face/env/lib/python3.10/site-packages/torchaudio/_backend/utils.py:213: UserWarning: In 2.9, this function's implementation will be changed to use torchaudio.load_with_torchcodec` under the hood. Some parameters like ``normalize``, ``format``, ``buffer_size``, and ``backend`` will be ignored. We recommend that you port your code to rely directly on TorchCodec's decoder instead: https://docs.pytorch.org/torchcodec/stable/generated/torchcodec.decoders.AudioDecoder.html#torchcodec.decoders.AudioDecoder.
+  warnings.warn(
+/workspace/speech2face/env/lib/python3.10/site-packages/torchaudio/_backend/ffmpeg.py:88: UserWarning: torio.io._streaming_media_decoder.StreamingMediaDecoder has been deprecated. This deprecation is part of a large refactoring effort to transition TorchAudio into a maintenance phase. The decoding and encoding capabilities of PyTorch for both audio and video are being consolidated into TorchCodec. Please see https://github.com/pytorch/audio/issues/3902 for more information. It will be removed from the 2.9 release. 
+  s = torchaudio.io.StreamReader(src, format, None, buffer_size)
+Session ready: {'type': 'server_ready', 'variant': 'TRY13-HANDSHAKE-FULL-BRIDGE-BNB4-FP32', 'session_id': 'e2c66b57a6f64fb29dcd95b9e21973c2', 'video_ws_path': '/ws/video?session_id=e2c66b57a6f64fb29dcd95b9e21973c2', 'sample_rate': 24000, 'output_audio_codec': 'opus', 'model_type': 'moshi_reply+helium_fm+renderer', 'tokens_per_chunk': 2, 'has_audio_file': False, 'buffer_ms': 80, 'av_transport': 'binary', 'target_fps': 25.0, 'session_capture': True}
+Streaming 29.6s of audio + 15.0s silence = 44.6s total ...
+  ... 12s sent, 260 frames captured
+  ... 24s sent, 560 frames captured
+  ... 36s sent, 860 frames captured
+
+Done: 558 audio msgs, 1115 video frames (22.5 fps)
+Saved 1114 JPEG frames to offline_test_neutral/frames/
+Video: offline_test_neutral/output.mp4 (1.7 MB)

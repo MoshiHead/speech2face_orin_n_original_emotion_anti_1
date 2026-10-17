@@ -1,0 +1,9 @@
+$ $(cat .python_path) tools/test_session.py 8991 40
+/workspace/speech2face/env/lib/python3.10/site-packages/torchaudio/_backend/utils.py:213: UserWarning: In 2.9, this function's implementation will be changed to use torchaudio.load_with_torchcodec` under the hood. Some parameters like ``normalize``, ``format``, ``buffer_size``, and ``backend`` will be ignored. We recommend that you port your code to rely directly on TorchCodec's decoder instead: https://docs.pytorch.org/torchcodec/stable/generated/torchcodec.decoders.AudioDecoder.html#torchcodec.decoders.AudioDecoder.
+  warnings.warn(
+/workspace/speech2face/env/lib/python3.10/site-packages/torchaudio/_backend/ffmpeg.py:88: UserWarning: torio.io._streaming_media_decoder.StreamingMediaDecoder has been deprecated. This deprecation is part of a large refactoring effort to transition TorchAudio into a maintenance phase. The decoding and encoding capabilities of PyTorch for both audio and video are being consolidated into TorchCodec. Please see https://github.com/pytorch/audio/issues/3902 for more information. It will be removed from the 2.9 release. 
+  s = torchaudio.io.StreamReader(src, format, None, buffer_size)
+sent 40s of audio | received 501 audio msgs, 1001 video frames (23.3 fps)
+heard 3.6s of speech | said 20.9s | step time median 26.6 ms (budget 80)
+model said: Hello, thank you for calling RB Labs. How can I assist you today? Sure, large language models are like a giant memory that can match any text. They use neural networks with many layers. You feed them text and they try to match. They can do things like translation or even give you a short answer. They’ trained on big corpora, so they can pick up patterns. They’ a big step in natural language processing, you know. They’ getting faster and more efficient. Any specific use case you want to hear about?
+FAIL

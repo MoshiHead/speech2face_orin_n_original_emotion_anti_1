@@ -47,6 +47,25 @@ for p in (str(IMTALKER), str(NILOYS)):
 
 def _load_renderer(renderer_path: str, device: torch.device):
     """Load the full IMTRenderer (we only need its MotionEncoder)."""
+    if not os.path.exists(renderer_path):
+        print(f"Renderer checkpoint not found at '{renderer_path}'.")
+        print("Downloading renderer.ckpt from HuggingFace repo 'cbsjtu01/IMTalker' (~2.1 GB) ...")
+        from huggingface_hub import hf_hub_download
+        os.makedirs(os.path.dirname(os.path.abspath(renderer_path)), exist_ok=True)
+        downloaded = hf_hub_download(
+            repo_id="cbsjtu01/IMTalker",
+            filename="renderer.ckpt",
+            token=os.environ.get("HF_TOKEN")
+        )
+        # Symlink or copy to target path
+        if not os.path.exists(renderer_path):
+            try:
+                os.symlink(downloaded, renderer_path)
+            except OSError:
+                import shutil
+                shutil.copy2(downloaded, renderer_path)
+        print(f"    Renderer checkpoint ready at {renderer_path}")
+
     from types import SimpleNamespace
     args = SimpleNamespace(
         input_size=512,
@@ -122,9 +141,10 @@ def main():
                         help="Path to the happy expression video")
     parser.add_argument("--neutral_video", required=True,
                         help="Path to the neutral expression video")
-    parser.add_argument("--renderer_path", required=True,
-                        help="Path to the full IMTRenderer checkpoint (renderer.ckpt)")
-    parser.add_argument("--student_ckpt", default="",
+    parser.add_argument("--renderer_path", default="weights/renderer.ckpt",
+                        help="Path to the full IMTRenderer checkpoint (renderer.ckpt). "
+                             "If not found, will download automatically from HF (cbsjtu01/IMTalker)")
+    parser.add_argument("--student_ckpt", default="weights/motion_student_38M.pt",
                         help="Path to the CausalMotionStudent checkpoint "
                              "(for normalization stats; optional)")
     parser.add_argument("--output", required=True,

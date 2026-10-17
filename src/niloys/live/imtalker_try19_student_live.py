@@ -32,13 +32,19 @@ from pathlib import Path
 import torch
 
 import os as _os
+HERE = Path(__file__).resolve().parent
 IMTALKER = Path(_os.environ.get("IMTALKER_DIR",
     "/home/ubuntu/project/speech2avatar_imtalker_personaplex_try_vad6_8998/IMTalker"))
 DESIGN_A = Path(_os.environ.get("DESIGN_A_DIR",
     "/home/ubuntu/project/imtalker_world_model/design_a"))
-for _p in (str(IMTALKER), str(DESIGN_A)):
+for _p in (str(IMTALKER), str(DESIGN_A), str(HERE)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
+
+try:
+    from expression import apply_smile_to_base_frame
+except Exception:
+    apply_smile_to_base_frame = None
 
 from student.model import CausalMotionStudent, StudentConfig  # noqa: E402
 from student.renderer import build as build_renderer          # noqa: E402
@@ -816,21 +822,19 @@ def main():
         _bl = load_blink_delta(mine.blink_delta, device) if mine.blink_delta else None
         D = load_distilled_renderer(mine.distilled_renderer, device)
         if mine.expression_alpha > 0:
-            try:
-                import sys
-                here = Path(__file__).resolve().parent
-                if str(here) not in sys.path:
-                    sys.path.insert(0, str(here))
-                from expression import apply_smile_to_base_frame
+            if apply_smile_to_base_frame is not None:
                 print(f"[try19] applying natural smile expression: "
                       f"alpha={mine.expression_alpha} preset={mine.expression_preset}", flush=True)
-                with torch.no_grad():
-                    warped_base = apply_smile_to_base_frame(
-                        D.base_frame, alpha=mine.expression_alpha, preset=mine.expression_preset
-                    )
-                    D.base_frame.copy_(warped_base)
-            except Exception as e:
-                print(f"[try19] WARNING failed to apply smile expression: {e}", flush=True)
+                try:
+                    with torch.no_grad():
+                        warped_base = apply_smile_to_base_frame(
+                            D.base_frame, alpha=mine.expression_alpha, preset=mine.expression_preset
+                        )
+                        D.base_frame.copy_(warped_base)
+                except Exception as e:
+                    print(f"[try19] WARNING failed to apply smile expression: {e}", flush=True)
+            else:
+                print("[try19] WARNING apply_smile_to_base_frame module not found; running neutral", flush=True)
         patch_render(live, D, _bl)
     print(f"[try19] motion_gain={mine.motion_gain}", flush=True)
     print(f"[try19] barge-in crossfade: {mine.blend_frames} frames "

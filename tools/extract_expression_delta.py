@@ -161,12 +161,11 @@ def main():
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
-    # 1. Load the full renderer's MotionEncoder
     print("Loading full IMTRenderer (MotionEncoder) ...")
     renderer = _load_renderer(args.renderer_path, device)
     motion_encoder = renderer.latent_token_encoder
-    print(f"    MotionEncoder output dim: "
-          f"{renderer.latent_token_encoder.final_linear.out_features}")
+    out_dim = motion_encoder.final_linear.weight.shape[0]
+    print(f"    MotionEncoder output dim: {out_dim}")
 
     # 2. Extract motions from both videos
     print("Extracting motions from happy video ...")

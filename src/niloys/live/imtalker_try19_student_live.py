@@ -247,13 +247,13 @@ def make_student_sampler(model, cfg, blend_frames=10, jump_thresh=0.6, mouth_clo
             pred_n = mu + (pred_n - mu) * motion_gain
             ss = dict(ss); ss["_student_gain_mu"] = mu.detach()
         # ---- expression blend (after gain, before denorm) ----
-        # expression_delta and expression_mask are [32]; pred_n is [1, steps, 64]
-        # where 64 = frames_per_step(2) * motion_dim(32).  Tile the delta to
-        # match [64] so both sub-frames of each step receive the same shift.
+        # pred_n has shape [B, steps, frames_per_step(2), motion_dim(32)]
+        # expression_delta and expression_mask are [32].
+        # Adding (mask * delta * alpha) of shape [32] broadcasts seamlessly over
+        # the last dimension (dim -1 = 32), shifting every frame by the same delta.
         if expression_delta is not None and expression_mask is not None:
-            _ed = (expression_mask * expression_delta * expression_alpha)
-            _ed_tiled = _ed.repeat(cfg.frames_per_step)  # [64]
-            pred_n = pred_n + _ed_tiled
+            _ed = (expression_mask * expression_delta * expression_alpha).to(pred_n.dtype)
+            pred_n = pred_n + _ed
         motion = model.denorm_motion(pred_n)[0].reshape(-1, 32)
 
         if motion.shape[0] < target_frames:

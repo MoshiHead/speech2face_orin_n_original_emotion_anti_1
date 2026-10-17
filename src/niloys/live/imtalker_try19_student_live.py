@@ -149,7 +149,9 @@ def load_student(ckpt: str, device):
 
 
 def make_student_sampler(model, cfg, blend_frames=10, jump_thresh=0.6, mouth_close=0.0,
-                         ref_x=None, motion_gain=1.0):
+                         ref_x=None, motion_gain=1.0,
+                         expression_delta=None, expression_mask=None,
+                         expression_alpha=1.0):
     """blend_frames: length of the barge-in crossfade, in 25fps frames (10 = 400 ms).
 
     The server has its own transition crossfade but TRANSITION_BLEND_FRAMES=0
@@ -244,6 +246,14 @@ def make_student_sampler(model, cfg, blend_frames=10, jump_thresh=0.6, mouth_clo
             mu = cur if not isinstance(mu, torch.Tensor) else (0.99 * mu + 0.01 * cur)
             pred_n = mu + (pred_n - mu) * motion_gain
             ss = dict(ss); ss["_student_gain_mu"] = mu.detach()
+        # ---- expression blend (after gain, before denorm) ----
+        # expression_delta and expression_mask are [32]; pred_n is [1, steps, 64]
+        # where 64 = frames_per_step(2) * motion_dim(32).  Tile the delta to
+        # match [64] so both sub-frames of each step receive the same shift.
+        if expression_delta is not None and expression_mask is not None:
+            _ed = (expression_mask * expression_delta * expression_alpha)
+            _ed_tiled = _ed.repeat(cfg.frames_per_step)  # [64]
+            pred_n = pred_n + _ed_tiled
         motion = model.denorm_motion(pred_n)[0].reshape(-1, 32)
 
         if motion.shape[0] < target_frames:
@@ -485,6 +495,10 @@ def main():
                      help="max-abs motion jump that counts as a discontinuity")
     pre.add_argument("--mouth_close", type=float, default=0.5,
                      help="pull the crossfade start toward the reference (closed) pose, 0..1")
+    pre.add_argument("--expression_delta_path", default="",
+                     help="path to happy_expression_delta.pt for expression blending")
+    pre.add_argument("--expression_alpha", type=float, default=1.0,
+                     help="expression intensity multiplier (0=off, 1=full, >1=exaggerated)")
     mine, remaining = pre.parse_known_args()
 
     if any(a == "8998" for a in remaining):
@@ -779,10 +793,28 @@ def main():
                           map_location=device)["ref_x"].float().to(device)
     except Exception as e:
         print(f"[try19] ref_x unavailable ({e}); mouth_close disabled", flush=True)
+
+    # ---- expression delta (happy / sad / etc.) ----
+    expr_delta = None
+    expr_mask = None
+    expr_alpha = float(mine.expression_alpha)
+    if mine.expression_delta_path:
+        try:
+            _ep = torch.load(mine.expression_delta_path, map_location="cpu")
+            expr_delta = _ep["expression_delta"].float().to(device)   # [32]
+            expr_mask = _ep["expression_mask"].float().to(device)     # [32]
+            print(f"[try19] expression delta loaded: {mine.expression_delta_path}"
+                  f" alpha={expr_alpha}"
+                  f" mask_active={(expr_mask > 0.5).sum().item()}/32", flush=True)
+        except Exception as e:
+            print(f"[try19] WARNING expression delta load failed: {e!r}", flush=True)
+
     live.LiveHeliumFMEngine._sample_motion_from_helium = make_student_sampler(
         model, cfg, blend_frames=mine.blend_frames, jump_thresh=mine.jump_thresh,
         mouth_close=(mine.mouth_close if refx is not None else 0.0), ref_x=refx,
-        motion_gain=mine.motion_gain)
+        motion_gain=mine.motion_gain,
+        expression_delta=expr_delta, expression_mask=expr_mask,
+        expression_alpha=expr_alpha)
     if mine.dep_q > 0:
         patch_depformer(live, mine.dep_q)
     if mine.distilled_renderer:

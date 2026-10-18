@@ -8,8 +8,8 @@ Usage:
         --preview_path assets/expression_preview.jpg \
         --delta_output assets/happy_expression_delta.pt
 
-This tool generates the calibrated 32-D motion space smile expression vector and
-renders a genuine side-by-side preview directly through the DistilledRenderer.
+This tool applies the calibrated post-render smile expression deformation and
+renders a genuine side-by-side preview of the avatar in neutral vs smiling.
 """
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from PIL import Image
 
 HERE = Path(__file__).resolve().parent
@@ -31,7 +32,7 @@ LIVE = NILOYS / "live"
 if str(LIVE) not in sys.path:
     sys.path.insert(0, str(LIVE))
 
-from expression import CALIBRATED_SMILE_DELTA_32D, PRESETS, get_expression_delta  # noqa: E402
+from expression import PRESETS, get_smile_grid  # noqa: E402
 from student.renderer import build as build_renderer  # noqa: E402
 
 
@@ -58,7 +59,7 @@ def main():
         "--alpha",
         type=float,
         default=1.0,
-        help="Smile intensity multiplier (0=neutral, 0.6=subtle, 1.0=natural, 1.25=happy, 1.5=broad)",
+        help="Smile intensity multiplier (0=neutral, 0.65=subtle, 1.0=natural, 1.25=happy, 1.5=broad)",
     )
     parser.add_argument(
         "--preset",
@@ -76,21 +77,27 @@ def main():
     renderer = build_renderer(**pack["cfg"]).eval()
     renderer.load_state_dict(pack["model"])
 
-    # Compute normalized smile delta
-    norm_delta = get_expression_delta(alpha=args.alpha, preset=args.preset, device="cpu")
-    print(f"Smile expression delta: alpha={args.alpha}, preset={args.preset}")
-    print(f"    norm = {norm_delta.norm():.4f}, range = [{norm_delta.min():.4f}, {norm_delta.max():.4f}]")
-    print(f"    top-5 dims by |delta|: {norm_delta.abs().topk(5).indices.tolist()}")
+    print(f"Calibrating smile expression: alpha={args.alpha}, preset={args.preset}")
+    grid = get_smile_grid(512, 512, alpha=args.alpha, preset=args.preset, device="cpu")
 
-    # 1. Render side-by-side neutral vs smiling preview directly through DistilledRenderer
+    # 1. Render side-by-side neutral vs smiling preview directly
     if args.preview_path:
         os.makedirs(os.path.dirname(os.path.abspath(args.preview_path)), exist_ok=True)
         with torch.no_grad():
             m_neut = renderer.motion_mean.unsqueeze(0)
-            img_neut = renderer(m_neut)[0]
+            img_neut = renderer(m_neut)  # [1, 3, 512, 512]
 
-            m_smile = renderer.motion_mean.unsqueeze(0) + norm_delta.unsqueeze(0) * renderer.motion_std.unsqueeze(0)
-            img_smile = renderer(m_smile)[0]
+            if grid is not None:
+                img_smile = F.grid_sample(
+                    img_neut,
+                    grid,
+                    mode="bilinear",
+                    padding_mode="border",
+                    align_corners=True,
+                )[0]
+            else:
+                img_smile = img_neut[0]
+            img_neut = img_neut[0]
 
         neut_np = (img_neut.permute(1, 2, 0).clamp(0, 1).mul(255).byte().numpy())
         smile_np = (img_smile.permute(1, 2, 0).clamp(0, 1).mul(255).byte().numpy())
@@ -103,17 +110,16 @@ def main():
         Image.fromarray(side_by_side).save(args.preview_path, quality=95)
         print(f"Side-by-side preview saved to: {args.preview_path}")
 
-    # 2. Save expression delta bundle
+    # 2. Save expression metadata bundle
     if args.delta_output:
         os.makedirs(os.path.dirname(os.path.abspath(args.delta_output)), exist_ok=True)
         payload = {
-            "expression_delta": norm_delta,
-            "expression_mask": torch.ones(32),
             "alpha": args.alpha,
             "preset": args.preset,
             "preset_scale": PRESETS.get(args.preset, 1.0),
             "effective_scale": args.alpha * PRESETS.get(args.preset, 1.0),
-            "delta_norm": norm_delta.norm().item(),
+            "expression_delta": torch.zeros(32),
+            "expression_mask": torch.ones(32),
         }
         torch.save(payload, args.delta_output)
         print(f"Expression metadata saved to: {args.delta_output}")

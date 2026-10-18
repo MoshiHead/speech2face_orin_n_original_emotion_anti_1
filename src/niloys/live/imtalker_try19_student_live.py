@@ -42,9 +42,9 @@ for _p in (str(IMTALKER), str(DESIGN_A), str(HERE)):
         sys.path.insert(0, _p)
 
 try:
-    from expression import get_expression_delta
+    from expression import get_smile_grid
 except Exception:
-    get_expression_delta = None
+    get_smile_grid = None
 
 from student.model import CausalMotionStudent, StudentConfig  # noqa: E402
 from student.renderer import build as build_renderer          # noqa: E402
@@ -353,7 +353,7 @@ def load_blink_delta(path, device):
     return d, int(b["y0"]), int(b["y1"]), int(b["x0"]), int(b["x1"]), int(b["length"])
 
 
-def patch_render(live, D, blink=None, expression_delta=None):
+def patch_render(live, D, blink=None, smile_grid=None):
     """Swap the frozen IMTalker renderer for the distilled single-identity decoder.
 
     NOTE: the distilled decoder was trained on frames rendered WITHOUT the
@@ -367,8 +367,6 @@ def patch_render(live, D, blink=None, expression_delta=None):
         mo = motion.to(self.device, dtype=next(D.parameters()).dtype)
         if mo.ndim == 1:
             mo = mo.unsqueeze(0)
-        if expression_delta is not None:
-            mo = mo + expression_delta
         start = int(self._render_frame_cursor)
         # Phase-conditioned decoder: blink is a learned 367-frame loop, so pass
         # the phase rather than adding a precomputed pixel table.
@@ -384,6 +382,15 @@ def patch_render(live, D, blink=None, expression_delta=None):
             idx = (torch.arange(int(mo.shape[0]), device=img.device) + start) % L
             img[:, :, y0:y1, x0:x1] = img[:, :, y0:y1, x0:x1] + bd.index_select(0, idx)
         img = img.clamp(0, 1)
+        if smile_grid is not None:
+            grid = smile_grid.to(device=img.device, dtype=img.dtype)
+            img = F.grid_sample(
+                img,
+                grid.expand(img.shape[0], -1, -1, -1),
+                mode="bilinear",
+                padding_mode="border",
+                align_corners=True,
+            )
         self._render_frame_cursor += int(mo.shape[0])
         out = img.mul(255).to(torch.uint8).permute(0, 2, 3, 1).contiguous().cpu().numpy()
         return out, {"total_ms": (time.perf_counter() - t0) * 1000.0}
@@ -823,26 +830,22 @@ def main():
     if mine.distilled_renderer:
         _bl = load_blink_delta(mine.blink_delta, device) if mine.blink_delta else None
         D = load_distilled_renderer(mine.distilled_renderer, device)
-        raw_expr_delta = None
-        if mine.expression_alpha > 0 and get_expression_delta is not None:
+        smile_grid = None
+        if mine.expression_alpha > 0 and get_smile_grid is not None:
             try:
-                norm_delta = get_expression_delta(
+                smile_grid = get_smile_grid(
+                    height=512, width=512,
                     alpha=mine.expression_alpha,
                     preset=mine.expression_preset,
-                    delta_path=mine.expression_delta_path,
                     device=device,
                 )
-                raw_expr_delta = (norm_delta * D.motion_std).to(
-                    device=device, dtype=next(D.parameters()).dtype
-                )
-                print(f"[try19] calibrated smile expression applied: "
-                      f"alpha={mine.expression_alpha} preset={mine.expression_preset} "
-                      f"delta_norm={norm_delta.norm().item():.3f}", flush=True)
+                print(f"[try19] post-render smile expression applied: "
+                      f"alpha={mine.expression_alpha} preset={mine.expression_preset}", flush=True)
             except Exception as e:
-                print(f"[try19] WARNING failed to apply expression delta: {e}", flush=True)
+                print(f"[try19] WARNING failed to create smile expression grid: {e}", flush=True)
         elif mine.expression_alpha > 0:
-            print("[try19] WARNING get_expression_delta not available; running neutral", flush=True)
-        patch_render(live, D, _bl, expression_delta=raw_expr_delta)
+            print("[try19] WARNING get_smile_grid not available; running neutral", flush=True)
+        patch_render(live, D, _bl, smile_grid=smile_grid)
     print(f"[try19] motion_gain={mine.motion_gain}", flush=True)
     print(f"[try19] barge-in crossfade: {mine.blend_frames} frames "
           f"({mine.blend_frames*40} ms), jump_thresh={mine.jump_thresh}, "

@@ -58,11 +58,12 @@ fi
 # ---- expression configuration (natural smile) ----
 EXPR_ALPHA="${EXPR_ALPHA:-1.0}"
 EXPR_PRESET="${EXPR_PRESET:-natural}"
+EXPR_DELTA_PATH="${EXPR_DELTA_PATH:-assets/happy_expression_delta.pt}"
 EXPR_FLAGS="--expression_alpha $EXPR_ALPHA --expression_preset $EXPR_PRESET"
-if [ -n "${EXPR_DELTA_PATH:-}" ] && [ -s "$EXPR_DELTA_PATH" ]; then
+if [ -s "$EXPR_DELTA_PATH" ]; then
   EXPR_FLAGS="$EXPR_FLAGS --expression_delta_path $EXPR_DELTA_PATH"
 fi
-echo "expression: alpha=$EXPR_ALPHA preset=$EXPR_PRESET"
+echo "expression: alpha=$EXPR_ALPHA preset=$EXPR_PRESET (delta=$EXPR_DELTA_PATH)"
 
 mkdir -p "$SRC/niloys/live/static" "$HERE/captures"
 ln -sfn "$SRC/imtalker/static/assets" "$SRC/niloys/live/static/assets"
